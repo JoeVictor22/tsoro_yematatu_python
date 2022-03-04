@@ -17,28 +17,37 @@ def handle_client(conn, addr):
         for packet in packets:
 
             if packet != "":
+                packet = json.loads(packet)
                 pprint(packet)
-                # this is a message sent
-                """
-                [thread] server: sent: {"event": "2client", "data": {"name": "sou o client"}}
-                '{"event": "2server", "data": {"name": "sou o server"}}'
-    
-                """
 
+                if packet.get("event"):
+                    send_event({"event_received": packet["event"]})
+                    pprint(packet)
+                    if packet["event"] == "REGISTER":
+                        print("register")
+                        # game_state.set_new_player()
+                        # send_back ID
+                    if packet["event"] == "COLOR":
+                        print("color")
+                        # game_state.set_color(packet.get("color"), packet.get("id"))
+                    if packet["event"] == "JOGADA":
+                        print("jogada")
+                        # game_state.faz_jogada(packet.get("jogada"), packet.get("id"))
+                    if packet["event"] == "SURRENDER":
+                        print("surrender")
+                        # game_state.render(packet.get("id"))
+                    if packet["event"] == "MESSAGE":
+                        print("message")
 
-def publish_event(event, data):
+def publish_event(data):
     socket = c or s
-    packet = json.dumps({"event": event, "data": data})
+    packet = json.dumps(data)
     socket.send((packet + "\n").encode())
     print("[thread] server: sent: " + packet)
 
 
-def send_event(event, data, publish=True, emit=True, bypass_turn=False):
-    import time
-
-    # time.sleep(2)
-    publish_event(event, data)
-    publish_event("2" + event, data)
+def send_event( data, publish=True, emit=True, bypass_turn=False):
+    publish_event(data)
 
 
 def create_client():
@@ -65,6 +74,6 @@ def create_server():
     c, addr = s.accept()
     t = threading.Thread(target=handle_client, args=(c, addr))
     t.start()
-    send_event("server", {"name": "sou o server"})
+    send_event({"name": "sou o server"})
 
     return 1

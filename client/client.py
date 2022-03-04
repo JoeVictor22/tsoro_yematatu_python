@@ -4,6 +4,8 @@ from pygame.locals import *
 
 # based on https://techvidvan.com/tutorials/python-game-project-tic-tac-toe/
 # initialize global variables
+from client.server import send_event
+
 XO = "x"
 winner = None
 draw = False
@@ -11,14 +13,25 @@ width = 400
 height = 400
 white = (255, 255, 255)
 black = (0, 0, 0)
+
 red = (255, 0 , 0)
 green = (0, 255, 0)
 blue = (0, 0, 255)
+
+yellow = (255, 255 , 0)
+cyan = (0,255,255)
+magenta = (255,0,255)
+
+orange = 	(255,165,0)
+brown = (139,69,19)
+pink = (255,20,147)
+
+
 line_color = black
 # TicTacToe 3x3 board
 GAME = [0 for _ in range(7)]
 player_color = None
-cores_matrix = [[red, green, blue], [red, green, blue], [red, green, blue]]
+cores_matrix = [[red, green, blue], [yellow, cyan, magenta], [orange, brown, pink]]
 
 pg.init()
 fps = 30
@@ -60,6 +73,7 @@ def draw_text(message):
     pg.display.update()
 
 def game_opening():
+    send_register()
     screen.blit(opening, (0, 0))
     pg.display.update()
     pg.draw.circle(screen, white, (width/2, height/2), width/3)
@@ -115,20 +129,30 @@ def check_win():
 def reset_game():
     game_opening()
 
-
 def get_color():
-    from client.server import send_event
     global player_color
     # get coordinates of mouse click
     x, y = pg.mouse.get_pos()
     row, col = get_box_selected(x, y)
-    print(row, col)
     global cores_matrix
-    print(cores_matrix)
     if row is not None and col is not None:
-        send_event("selecionei a cor", {"x": x, "y": y})
+        send_color(cores_matrix[row][col])
         player_color = cores_matrix[row][col]
-        print("escolhi a cor")
+
+def send_surrender():
+    send_event({"event": "SURRENDER", "id": "ID"})
+
+def send_register():
+    send_event({"event": "REGISTER"})
+
+def send_color(color):
+    send_event({"event": "COLOR", "color": color, "id": "ID"})
+
+def send_jogada(jogada):
+    send_event({"event": "JOGADA", "jogada": jogada, "id": "ID"})
+
+def send_message(message):
+    send_event({"event": "MESSAGE", "message": message, "id": "ID"})
 
 def get_box_selected(x, y):
     row, col = None, None
@@ -161,21 +185,18 @@ def get_circle_selected(x,y):
         ponto_x, ponto_y = posicao[0],posicao[1]
         ponto_tam = size_circle_game
         if (x >= ponto_x - (ponto_tam) and x <= ponto_x + (ponto_tam) and y >= ponto_y - (ponto_tam) and y <= ponto_y + (ponto_tam)):
-            print(f"ponto {i}: {posicoes_selecoes[i][0]}, {posicoes_selecoes[i][1]}")
-
-
-
+            row, col = posicoes_selecoes[i][0], posicoes_selecoes[i][1]
     return row, col
 
 def get_click():
     # get coordinates of mouse click
     x, y = pg.mouse.get_pos()
-    print(x,y)
     return x,y
 
 def get_jogada():
     row,col =get_circle_selected(*get_click())
-    print("escolheu", row, col)
+    if row:
+        send_jogada({"row":row, "col": col})
 
 import sys
 
@@ -191,7 +212,6 @@ while player_color is None:
             get_color()
     pg.display.update()
     CLOCK.tick(fps)
-print("ACABOU")
 
 
 # run the game loop forever
