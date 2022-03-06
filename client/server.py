@@ -8,9 +8,12 @@ import uuid
 import rsa
 from rsa import PublicKey, PrivateKey
 
+from client.const import MAX_CHAR_MSG
+
 SERVER_RSA_KEY = None
 
-(PUBLIC_KEY, PRIVATE_KEY) = rsa.newkeys(1024)
+(PUBLIC_KEY, PRIVATE_KEY) = rsa.newkeys(2048)
+
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 c = None
 
@@ -37,9 +40,11 @@ def handle_server(conn, addr):
 
                     if message["event"] == "COLOR":
                         COR_ADVERSARIO = message["color"]
-                    if message["event"] == "JOGADA":
+                    elif message["event"] == "JOGADA":
                         # TODO CHECK IF IS VALID
                         ESTADO_JOGO[message["index"]] = message["color"]
+                    elif message["event"] == "CHAT":
+                        add_to_messages(message["message"], who=2)
 
             except Exception as e:
                 pprint(e)
@@ -61,10 +66,11 @@ def handle_client(conn, addr):
                     print(f"[thread] {JOGADOR} : received: {message}")
                     if message["event"] == "COLOR":
                         COR_ADVERSARIO = message["color"]
-                    if message["event"] == "JOGADA":
+                    elif message["event"] == "JOGADA":
                         # TODO CHECK IF IS VALID
                         ESTADO_JOGO[message["index"]] = message["color"]
-
+                    elif message["event"] == "CHAT":
+                        add_to_messages(message["message"], who=2)
             except Exception as e:
                 pprint(e)
 
@@ -74,18 +80,33 @@ def send_event(data: "bytes", publish=True, emit=True, bypass_turn=False):
     socket.send(data)
 
 
-def send_public_key():
-    socket = c
-    pub_cert: bytes = PUBLIC_KEY.save_pkcs1()
-    print("\n----ENVIOU-KEY----")
-    socket.send(pub_cert)
-
-
 def receive_encrypted(encrypted: str):
     json_as_string = decrypt_message(encrypted)
     print(f"[thread] : {JOGADOR}: {json_as_string}")
     message = json.loads(json_as_string)
     return message
+
+
+MESSAGE_BUFFER = [""]
+
+def add_to_messages(message, who=0):
+    global MESSAGE_BUFFER
+
+    if message == "":
+        return
+
+    cat = "[info]: "
+    if who == 1:
+        cat = "[you]: "
+    elif who ==2:
+        cat = "[enemy]: "
+
+    message = cat + message
+    if len(MESSAGE_BUFFER) > 3: # max msgs displayed
+        MESSAGE_BUFFER.pop()
+    MESSAGE_BUFFER.insert(0, message)
+
+
 
 
 def send_encrypted(message: dict):
@@ -105,6 +126,10 @@ def send_encrypted(message: dict):
         index_jogada = message["index"]
         cor_jogada = message["color"]
         ESTADO_JOGO[index_jogada] = cor_jogada
+
+    elif message["event"] == "CHAT":
+        message["message"] = message["message"][:MAX_CHAR_MSG]
+        add_to_messages(message["message"], who=1)
 
     if deny:
         return False

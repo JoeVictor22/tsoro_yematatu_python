@@ -4,7 +4,7 @@ from pygame.locals import *
 
 # based on https://techvidvan.com/tutorials/python-game-project-tic-tac-toe/
 # initialize global variables
-from client.server import send_encrypted
+from client.server import send_encrypted, add_to_messages
 
 XO = "x"
 winner = None
@@ -59,18 +59,81 @@ opening = pg.image.load("background.png")
 opening = pg.transform.scale(opening, (width, height + 100))
 
 
-def draw_text(message):
+INPUT_MESSAGE_BUFFER = ""
+INPUT_BUFFER = ""
+def get_input(event):
+    charset = "abcdefghijklmnopqrstuvyxwz1234567890?!.,"
+    if event.key == pg.K_RETURN:
+        enviar_input_buffer()
+    elif event.key == pg.K_SPACE:
+        add_to_input_buffer(" ")
+    elif event.key == pg.K_BACKSPACE:
+        backspace_to_input_buffer()
+    elif pg.key.name(event.key) in charset:
+        add_to_input_buffer(pg.key.name(event.key))
 
-    font = pg.font.Font(None, 30)
-    text = font.render(message, 1, (255, 255, 255))
-    # copy the rendered message onto the board
-    screen.fill((0, 0, 0), (0, width, width, height))
-    text_rect = text.get_rect(center=(width / 2, height + height / 10))
-    screen.blit(text, text_rect)
+
+def enviar_input_buffer():
+    global INPUT_BUFFER
+    send_message(INPUT_BUFFER)
+    clear_input_buffer()
+
+def clear_input_buffer():
+    global INPUT_BUFFER
+    INPUT_BUFFER = ""
+
+def add_to_input_buffer(key:str):
+    global INPUT_BUFFER
+    if len(INPUT_BUFFER) > MAX_CHAR_MSG:
+        INPUT_BUFFER = INPUT_BUFFER[1:]
+    INPUT_BUFFER += key
+
+def backspace_to_input_buffer():
+    global INPUT_BUFFER
+    INPUT_BUFFER = INPUT_BUFFER[:-1]
+
+def draw_chat():
+    global INPUT_BUFFER
+    from client.server import MESSAGE_BUFFER
+    buffer = MESSAGE_BUFFER.copy()
+    buffer.insert(0, INPUT_BUFFER)
+    font_size = 20
+    font = pg.font.Font(None, font_size)
+
+    screen.fill((0, 0, 0), (0, width, width, height)) # box
+
+
+    added_height = int(font_size/100*70)
+    padding = int(font_size/100*20)
+    for idx, message in enumerate(buffer):
+        iter_message = message
+        text_color = green
+
+        if idx == 0:
+            text_color = white
+            if message == "":
+                iter_message = "Digite algo e envie pressionando ENTER!"
+
+
+        if message.startswith("[info]"):
+            text_color = cyan
+
+        if message.startswith("[enemy]"):
+            text_color = red
+
+
+
+        text = font.render(str(iter_message), True, text_color)
+        text.get_rect()
+        text_rect = text.get_rect(left=padding, top= (height + height/4 - added_height))
+        added_height += font_size
+        screen.blit(text, text_rect)
+
     pg.display.update()
 
 
 def game_opening(register=True):
+
     if register:
         send_register()
     screen.blit(opening, (0, 0))
@@ -107,12 +170,14 @@ def game_opening(register=True):
         screen, cores_matrix[2][2], (height / 1.2, height / 1.2), size_circle_color
     )
 
-    draw_text("Selecione sua cor")
+    add_to_messages("Selecione sua cor")
 
     import sys
 
     while COR_JOGADOR is None or COR_ADVERSARIO is None:
+        draw_chat()
         from client.server import COR_ADVERSARIO
+
 
         for event in pg.event.get():
             if event.type == QUIT:
@@ -121,8 +186,13 @@ def game_opening(register=True):
             elif event.type == MOUSEBUTTONDOWN and COR_JOGADOR is None:
                 # the user clicked; place an X or O
                 get_color()
+            elif event.type == pg.KEYDOWN:
+                get_input(event)
+
         pg.display.update()
         CLOCK.tick(fps)
+
+    add_to_messages("Jogo iniciado")
 
     # run the game loop forever
     while True:
@@ -137,13 +207,15 @@ def game_opening(register=True):
                 get_jogada()
                 # if False:
                 #     reset_game()
+            elif event.type == pg.KEYDOWN:
+                get_input(event)
         pg.display.update()
         CLOCK.tick(fps)
 
 
+
 def draw_game():
     screen.fill(white)
-
     global cores_matrix, ESTADO_JOGO
     from client.server import ESTADO_JOGO
 
@@ -178,14 +250,14 @@ def draw_game():
     pg.draw.circle(
         screen, ESTADO_JOGO[6] or black, posicoes_selecoes[6], size_circle_game
     )
+    draw_chat()
 
-    draw_text("faz a jogada ai")
 
 
 def check_win():
     # check for winning rows
     pg.draw.line(screen, (250, 70, 70), (350, 50), (50, 350), 4)
-    draw_text("venceu???")
+    add_to_messages("venceu???")
 
 
 def reset_game():
@@ -202,10 +274,10 @@ def get_color():
         COR_JOGADOR = cores_matrix[row][col]
 
         if not send_color():
-            draw_text("Cor já selecionada...")
+            add_to_messages("Cor já selecionada...")
             COR_JOGADOR = None
         else:
-            draw_text("Aguardando outro jogador...")
+            add_to_messages("Aguardando outro jogador...")
 
 
 def send_message_to_server(message: dict):
@@ -226,13 +298,14 @@ def send_color():
 
 
 def send_jogada(index_jogada):
+    add_to_messages(f"Jogada: {index_jogada}")
     return send_message_to_server(
         {"event": "JOGADA", "index": index_jogada, "color": COR_JOGADOR}
     )
 
 
 def send_message(message):
-    return send_message_to_server({"event": "MESSAGE", "message": message})
+    return send_message_to_server({"event": "CHAT", "message": message})
 
 
 def get_box_selected(x, y):
