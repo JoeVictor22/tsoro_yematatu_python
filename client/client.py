@@ -4,8 +4,8 @@ from pygame.locals import *
 
 # based on https://techvidvan.com/tutorials/python-game-project-tic-tac-toe/
 # initialize global variables
-from client.server import send_event
-
+from client.server import  send_encrypted_client
+SERVER_RSA_KEY = None
 XO = "x"
 winner = None
 draw = False
@@ -33,6 +33,8 @@ GAME = [0 for _ in range(7)]
 player_color = None
 cores_matrix = [[red, green, blue], [yellow, cyan, magenta], [orange, brown, pink]]
 
+import uuid
+MY_UUID = str(uuid.uuid4())
 pg.init()
 fps = 30
 CLOCK = pg.time.Clock()
@@ -73,12 +75,20 @@ def draw_text(message):
     pg.display.update()
 
 def game_opening():
-    send_register()
+    global SERVER_RSA_KEY
     screen.blit(opening, (0, 0))
     pg.display.update()
-    pg.draw.circle(screen, white, (width/2, height/2), width/3)
     time.sleep(1)
     screen.fill(white)
+
+    from pprint import pprint
+    while not SERVER_RSA_KEY:
+        from client.server import SERVER_RSA_KEY
+        draw_text("Aguardando conexão com o servidor")
+
+    draw_text("CONECTADO")
+
+    send_register()
 
     global cores_matrix
     pg.draw.circle(screen, cores_matrix[0][0], (width / 6, height / 6), size_circle_color)
@@ -120,6 +130,10 @@ def draw_game():
 
     draw_text("faz a jogada ai")
 
+def set_server_key(key):
+    global SERVER_RSA_KEY
+    SERVER_RSA_KEY = key
+
 def check_win():
     # check for winning rows
     pg.draw.line(screen, (250, 70, 70), (350, 50), (50, 350), 4)
@@ -139,20 +153,27 @@ def get_color():
         send_color(cores_matrix[row][col])
         player_color = cores_matrix[row][col]
 
+
+
+
+def send_message_to_server(message: dict):
+    message["id"] = MY_UUID
+    send_encrypted_client(message, rsa_key=SERVER_RSA_KEY)
+
 def send_surrender():
-    send_event({"event": "SURRENDER", "id": "ID"})
+    send_message_to_server({"event": "SURRENDER"})
 
 def send_register():
-    send_event({"event": "REGISTER"})
+    send_message_to_server({"event": "REGISTER"})
 
 def send_color(color):
-    send_event({"event": "COLOR", "color": color, "id": "ID"})
+    send_message_to_server({"event": "COLOR", "color": color})
 
 def send_jogada(jogada):
-    send_event({"event": "JOGADA", "jogada": jogada, "id": "ID"})
+    send_message_to_server({"event": "JOGADA", "jogada": jogada})
 
 def send_message(message):
-    send_event({"event": "MESSAGE", "message": message, "id": "ID"})
+    send_message_to_server({"event": "MESSAGE", "message": message})
 
 def get_box_selected(x, y):
     row, col = None, None
