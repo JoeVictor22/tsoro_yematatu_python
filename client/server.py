@@ -14,13 +14,16 @@ SERVER_RSA_KEY = None
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 c = None
 
-DEFAULT_ENCODING = 'utf-8'
+DEFAULT_ENCODING = "utf-8"
 from pprint import pprint
 
+ESTADO_JOGO = [None for _ in range(7)]
 CLIENT_ID = None
 JOGADOR = None
+COR_ADVERSARIO, COR_JOGADOR = None, None
 # TODO: check cliente_id
 def handle_server(conn, addr):
+    global COR_ADVERSARIO, ESTADO_JOGO
     print("\nSERVER: ESPERANDO MSGS\n")
     while True:
         message = conn.recv(1024)
@@ -31,12 +34,19 @@ def handle_server(conn, addr):
                 message = json.loads(message)
                 if message.get("event"):
                     print(f"[thread] {JOGADOR} : received: {message}")
-                    pprint(message)
+
+                    if message["event"] == "COLOR":
+                        COR_ADVERSARIO = message["color"]
+                    if message["event"] == "JOGADA":
+                        # TODO CHECK IF IS VALID
+                        ESTADO_JOGO[message["index"]] = message["color"]
+
             except Exception as e:
                 pprint(e)
 
+
 def handle_client(conn, addr):
-    global SERVER_RSA_KEY
+    global COR_ADVERSARIO, ESTADO_JOGO
     print("\nCLIENT: GAME LOOP\n")
 
     while True:
@@ -49,16 +59,20 @@ def handle_client(conn, addr):
                 message = json.loads(message)
                 if message.get("event"):
                     print(f"[thread] {JOGADOR} : received: {message}")
-                    pprint(message)
+                    if message["event"] == "COLOR":
+                        COR_ADVERSARIO = message["color"]
+                    if message["event"] == "JOGADA":
+                        # TODO CHECK IF IS VALID
+                        ESTADO_JOGO[message["index"]] = message["color"]
+
             except Exception as e:
                 pprint(e)
 
 
-from pprint import pprint
-
 def send_event(data: "bytes", publish=True, emit=True, bypass_turn=False):
     socket = c or s
     socket.send(data)
+
 
 def send_public_key():
     socket = c
@@ -66,17 +80,40 @@ def send_public_key():
     print("\n----ENVIOU-KEY----")
     socket.send(pub_cert)
 
+
 def receive_encrypted(encrypted: str):
     json_as_string = decrypt_message(encrypted)
     print(f"[thread] : {JOGADOR}: {json_as_string}")
     message = json.loads(json_as_string)
     return message
 
+
 def send_encrypted(message: dict):
+    global COR_JOGADOR, COR_ADVERSARIO, ESTADO_JOGO
+    ## TODO: check event and alter server_state, deny if needed
+    deny = False
+
+    if message["event"] == "COLOR":
+        pprint(COR_JOGADOR)
+        pprint(COR_ADVERSARIO)
+        pprint(message["color"])
+        if COR_ADVERSARIO and list(COR_ADVERSARIO) == list(message["color"]):
+            deny = True
+        else:
+            COR_JOGADOR = message["color"]
+    elif message["event"] == "JOGADA":
+        index_jogada = message["index"]
+        cor_jogada = message["color"]
+        ESTADO_JOGO[index_jogada] = cor_jogada
+
+    if deny:
+        return False
+
     message = json.dumps(message)
     print(f"[thread] {JOGADOR} : sent: {message}")
     message = encrypt_message(message)
     send_event(message)
+    return True
 
 
 def encrypt_message(message: str, rsa_key=PUBLIC_KEY) -> bytes:
@@ -89,10 +126,12 @@ def encrypt_message(message: str, rsa_key=PUBLIC_KEY) -> bytes:
     encryped_msg = rsa.encrypt(message, rsa_key)
     return encryped_msg
 
+
 def decrypt_message(message) -> str:
     decrypted_msg = rsa.decrypt(message, PRIVATE_KEY)
     # decrypted_msg = decrypted_msg.decode(DEFAULT_ENCODING)
     return decrypted_msg
+
 
 def create_client():
     # conecta a um server
