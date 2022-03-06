@@ -3,122 +3,57 @@ import json
 import socket
 import threading
 import time
+import uuid
 
 import rsa
-from rsa import PublicKey
-
+from rsa import PublicKey, PrivateKey
 
 SERVER_RSA_KEY = None
 
-(PUBLIC_KEY, PRIVATE_KEY) = rsa.newkeys(1024)
-
+# (PUBLIC_KEY, PRIVATE_KEY) = rsa.newkeys(1024)
+PUBLIC_KEY = PublicKey.load_pkcs1(b'-----BEGIN RSA PUBLIC KEY-----\nMIGJAoGBAJEr5hclMWjVjPJWG5ZiFhSvkABRhSVVjvxCViq9SdDWiIAlEbgK29QQ\nZmmBrlIjcXMdCQ3mMGJ5qqmjq+aHB+C+wFgz/OlKhtNw95HB0Ncggxhf0Zb3W3ZX\nvtsySMs6YNY6pXSKPttKPYcz38688XpmqP1eAuuqZslrJRzbJuOfAgMBAAE=\n-----END RSA PUBLIC KEY-----\n')
+PRIVATE_KEY = PrivateKey.load_pkcs1(b'-----BEGIN RSA PRIVATE KEY-----\nMIICYAIBAAKBgQCRK+YXJTFo1YzyVhuWYhYUr5AAUYUlVY78QlYqvUnQ1oiAJRG4\nCtvUEGZpga5SI3FzHQkN5jBieaqpo6vmhwfgvsBYM/zpSobTcPeRwdDXIIMYX9GW\n91t2V77bMkjLOmDWOqV0ij7bSj2HM9/OvPF6Zqj9XgLrqmbJayUc2ybjnwIDAQAB\nAoGAVuxLHCa3/AaKG3x1jkjy4bXxak9lguJE+EScJYErlrEuEFSh1GokEEk1mQz+\nHM5+GqgTCNCAviYNiv+mEJS0hAURhCjo1X4Bq/o6TLXNHHpcu6jvpVH8FsCKvagi\nbvHmsKI67eVHE2i/mCLHST9jEL5aNCw0RglCeGWh3yuDMekCRQCT6WVVPj4Eblch\n7v2K8PhEqx8v/p5camEtH/4UOMV2mpOsKy/ck7VubUmNmz8wIZpWe7uzKfNa07rf\n1CqlCmBQcx4/lQI9APtB4BeRME6whF3VWbCpQ4OKHeq5DzWh3xIVtWTL9Bc80FEi\nZJHyuFM8GdtF3HU3MfCc48tpzAZMcJPZYwJFAIZ5WH6CgyHGK4OXY32xjRXpOgaJ\nh/JfaQ/8mSRLZQNqj72k2fPBet71jzymG3Gn60ibX9AI4M3/11Nt8oNwBpa9wo9t\nAjwfogSPkwTs80ZG9gRrvHO2jN4FXjUvAGkwQrFqtk7N2icz/8t/oHpaaFetBpeh\n3kgYTfhT9MbuCBOoWZcCRC+wMgnoS5pLHCqF+duRZPqo2AMKyC5UfnUK4nQhAhrx\nuJJMPGv2OVQWJwrx+sxG1oqcoGlSqrChg7hNdyI2b+ai8cRQ\n-----END RSA PRIVATE KEY-----\n')
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 c = None
 
 DEFAULT_ENCODING = 'utf-8'
 from pprint import pprint
 
-JOGADOR_1, JOGADOR_2 = None, None
-
+CLIENT_ID = None
+JOGADOR = None
+# TODO: check cliente_id
 def handle_server(conn, addr):
-    print("\nSERVER: ESPERANDO JOGADORES\n")
-    global JOGADOR_1, JOGADOR_2
-    while not JOGADOR_1 and not JOGADOR_2:
-        """ Aguardando registro dos dois jogadores """
-        send_public_key()
-        message = conn.recv(1024)
-        print("VAIVAIVAIVAI")
-        if message != "":
-            try:
-                message = decrypt_message(message)
-                print("Mensagem descriptografada")
-                pprint(message)
-
-                message = message.decode()
-                message = json.loads(message)
-
-                if message.get("event"):
-                    if message["event"] == "REGISTER" and message.get("ID"):
-                        if not JOGADOR_1:
-                            JOGADOR_1 = message["ID"]
-                        elif not JOGADOR_2:
-                            JOGADOR_2 = message["ID"]
-
-            except Exception as e:
-                pprint(e)
-                message = message.decode()
-                print("MENSAGEM NAO CRIPTOGRAFADA")
-                pprint(message)
-                message = json.loads(message)
-                if message.get("event"):
-                    if message["event"] == "PUBLIC_KEY":
-                        send_public_key()
-
     print("\nSERVER: ESPERANDO MSGS\n")
-
     while True:
         message = conn.recv(1024)
         if message != "":
-            print("Servidor aguardando msgs")
-            pprint(message)
-
-
-
-        # from pprint import pprint
-        # for packet in packets:
-        #     if packet != "":
-        #         message = decrypt_message(message)
-        #
-        #         pprint(message)
-        #         if packet.get("event"):
-        #             send_encrypted({"event_received": packet["event"]})
-        #             pprint(packet)
-        #             if packet["event"] == "REGISTER":
-        #                 print("register")
-        #                 # game_state.set_new_player()
-        #                 # send_back ID
-        #             if packet["event"] == "COLOR":
-        #                 print("color")
-        #                 # game_state.set_color(packet.get("color"), packet.get("id"))
-        #             if packet["event"] == "JOGADA":
-        #                 print("jogada")
-        #                 # game_state.faz_jogada(packet.get("jogada"), packet.get("id"))
-        #             if packet["event"] == "SURRENDER":
-        #                 print("surrender")
-        #                 # game_state.render(packet.get("id"))
-        #             if packet["event"] == "MESSAGE":
-        #                 print("message")
-
-
-def handle_client(conn, addr):
-    global SERVER_RSA_KEY
-    print("\nCLIENT: ESPERANDO KEY\n")
-    while not SERVER_RSA_KEY:
-        from pprint import pprint
-
-        """ Waiting for pub key """
-        send_event(json.dumps({"event": "PUBLIC_KEY"}).encode())
-        time.sleep(1)
-        message = conn.recv(1024)
-
-        if message != "":
             try:
-                SERVER_RSA_KEY = PublicKey.load_pkcs1(message)
+                message = decrypt_message(message)
+                message = message.decode()
+                message = json.loads(message)
+                if message.get("event"):
+                    print(f"[thread] {JOGADOR} : received: {message}")
+                    pprint(message)
             except Exception as e:
                 pprint(e)
 
+def handle_client(conn, addr):
+    global SERVER_RSA_KEY
     print("\nCLIENT: GAME LOOP\n")
 
     while True:
         """Game loop"""
         message = conn.recv(1024)
-        from pprint import pprint
-
-        message = message.decode(DEFAULT_ENCODING)
-        packets = message.split("\n")
-        for packet in packets:
-            if packet != "":
-                pprint(message)
+        if message != "":
+            try:
+                message = decrypt_message(message)
+                message = message.decode()
+                message = json.loads(message)
+                if message.get("event"):
+                    print(f"[thread] {JOGADOR} : received: {message}")
+                    pprint(message)
+            except Exception as e:
+                pprint(e)
 
 
 from pprint import pprint
@@ -135,21 +70,14 @@ def send_public_key():
 
 def receive_encrypted(encrypted: str):
     json_as_string = decrypt_message(encrypted)
-    print("[thread] : received: " + json_as_string)
+    print(f"[thread] : {JOGADOR}: {json_as_string}")
     message = json.loads(json_as_string)
     return message
 
-
 def send_encrypted(message: dict):
     message = json.dumps(message)
-    print("[thread] server : sent: " + message)
+    print(f"[thread] {JOGADOR} : sent: {message}")
     message = encrypt_message(message)
-    send_event(message)
-
-def send_encrypted_client(message: dict, rsa_key):
-    message = json.dumps(message)
-    print("[thread] client : sent: " + message)
-    message = encrypt_message(message,rsa_key)
     send_event(message)
 
 
@@ -170,19 +98,20 @@ def decrypt_message(message) -> str:
 
 def create_client():
     # conecta a um server
+    global JOGADOR
+    JOGADOR = 2
     print("Trying to connect")
     s.connect(("127.0.0.1", 8123))
     t = threading.Thread(target=handle_client, args=(s, "localhost"))
     t.start()
-
     print("Connected")
-
     return 2
 
 
 def create_server():
     print("Not able to connect. Becoming the server.")
-    global c
+    global c, JOGADOR
+    JOGADOR = 1
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(("127.0.0.1", 8123))
     s.listen(20)
@@ -190,6 +119,4 @@ def create_server():
     c, addr = s.accept()
     t = threading.Thread(target=handle_server, args=(c, addr))
     t.start()
-    send_encrypted({"name": "sou o server"})
-
     return 1

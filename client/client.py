@@ -4,8 +4,7 @@ from pygame.locals import *
 
 # based on https://techvidvan.com/tutorials/python-game-project-tic-tac-toe/
 # initialize global variables
-from client.server import  send_encrypted_client
-SERVER_RSA_KEY = None
+from client.server import  send_encrypted
 XO = "x"
 winner = None
 draw = False
@@ -74,21 +73,13 @@ def draw_text(message):
     screen.blit(text, text_rect)
     pg.display.update()
 
-def game_opening():
-    global SERVER_RSA_KEY
+def game_opening(register=True):
+    if register:
+        send_register()
     screen.blit(opening, (0, 0))
     pg.display.update()
     time.sleep(1)
     screen.fill(white)
-
-    from pprint import pprint
-    while not SERVER_RSA_KEY:
-        from client.server import SERVER_RSA_KEY
-        draw_text("Aguardando conexão com o servidor")
-
-    draw_text("CONECTADO")
-
-    send_register()
 
     global cores_matrix
     pg.draw.circle(screen, cores_matrix[0][0], (width / 6, height / 6), size_circle_color)
@@ -102,6 +93,39 @@ def game_opening():
     pg.draw.circle(screen, cores_matrix[2][2], (height/1.2 , height / 1.2), size_circle_color)
 
     draw_text("Selecione sua cor")
+
+    import sys
+
+    while player_color is None:
+        for event in pg.event.get():
+            if event.type == QUIT:
+                pg.quit()
+                sys.exit()
+            elif event.type == MOUSEBUTTONDOWN:
+                # the user clicked; place an X or O
+                get_color()
+        pg.display.update()
+        CLOCK.tick(fps)
+
+
+    # run the game loop forever
+    while True:
+        draw_game()
+
+        for event in pg.event.get():
+            if event.type == QUIT:
+                pg.quit()
+                sys.exit()
+            elif event.type == MOUSEBUTTONDOWN:
+                # the user clicked; place an X or O
+                get_jogada()
+                # if False:
+                #     reset_game()
+        pg.display.update()
+        CLOCK.tick(fps)
+
+
+
 
 def draw_game():
     screen.fill(white)
@@ -130,10 +154,6 @@ def draw_game():
 
     draw_text("faz a jogada ai")
 
-def set_server_key(key):
-    global SERVER_RSA_KEY
-    SERVER_RSA_KEY = key
-
 def check_win():
     # check for winning rows
     pg.draw.line(screen, (250, 70, 70), (350, 50), (50, 350), 4)
@@ -154,11 +174,9 @@ def get_color():
         player_color = cores_matrix[row][col]
 
 
-
-
 def send_message_to_server(message: dict):
     message["id"] = MY_UUID
-    send_encrypted_client(message, rsa_key=SERVER_RSA_KEY)
+    send_encrypted(message)
 
 def send_surrender():
     send_message_to_server({"event": "SURRENDER"})
@@ -170,7 +188,7 @@ def send_color(color):
     send_message_to_server({"event": "COLOR", "color": color})
 
 def send_jogada(jogada):
-    send_message_to_server({"event": "JOGADA", "jogada": jogada})
+    send_message_to_server({"event": "JOGADA", "jogada": {"x": int(jogada["row"]), "col": int(jogada["col"])}})
 
 def send_message(message):
     send_message_to_server({"event": "MESSAGE", "message": message})
@@ -218,37 +236,4 @@ def get_jogada():
     row,col =get_circle_selected(*get_click())
     if row:
         send_jogada({"row":row, "col": col})
-
-import sys
-
-game_opening()
-
-while player_color is None:
-    for event in pg.event.get():
-        if event.type == QUIT:
-            pg.quit()
-            sys.exit()
-        elif event.type == MOUSEBUTTONDOWN:
-            # the user clicked; place an X or O
-            get_color()
-    pg.display.update()
-    CLOCK.tick(fps)
-
-
-# run the game loop forever
-while True:
-    draw_game()
-
-    for event in pg.event.get():
-        if event.type == QUIT:
-            pg.quit()
-            sys.exit()
-        elif event.type == MOUSEBUTTONDOWN:
-            # the user clicked; place an X or O
-            get_jogada()
-            # if False:
-            #     reset_game()
-    pg.display.update()
-    CLOCK.tick(fps)
-
 
