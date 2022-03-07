@@ -24,7 +24,6 @@ ESTADO_JOGO = [None for _ in range(7)]
 CLIENT_ID = None
 JOGADOR = None
 COR_ADVERSARIO, COR_JOGADOR = None, None
-# TODO: check cliente_id
 def handle_server(conn, addr):
     global COR_ADVERSARIO, ESTADO_JOGO
     print("\nSERVER: ESPERANDO MSGS\n")
@@ -40,14 +39,31 @@ def handle_server(conn, addr):
 
                     if message["event"] == "COLOR":
                         COR_ADVERSARIO = message["color"]
-                    elif message["event"] == "JOGADA":
-                        # TODO CHECK IF IS VALID
-                        ESTADO_JOGO[message["index"]] = message["color"]
+                    elif message["event"] == "JOGADA_1":
+                        realiza_jogada_1(message["index"], message["color"])
+                    elif message["event"] == "JOGADA_2":
+                        realiza_jogada_2(message["index_1"], message["index_2"], message["color"])
                     elif message["event"] == "CHAT":
                         add_to_messages(message["message"], who=2)
 
             except Exception as e:
                 pprint(e)
+
+
+def realiza_jogada_1(posicao, cor):
+    quantidade_de_jogadas = len([a for a in ESTADO_JOGO if a is not None])
+    print(quantidade_de_jogadas)
+    if ESTADO_JOGO[posicao] is None and quantidade_de_jogadas < 6:
+        ESTADO_JOGO[posicao] = cor
+        return True
+    return False
+
+def realiza_jogada_2(posicao_1, posicao_2, cor):
+    if ESTADO_JOGO[posicao_1] is None:
+        # ESTADO_JOGO[posicao] = cor
+        pprint("JOGADA 2")
+        return True
+    return False
 
 
 def handle_client(conn, addr):
@@ -66,10 +82,11 @@ def handle_client(conn, addr):
                     print(f"[thread] {JOGADOR} : received: {message}")
                     if message["event"] == "COLOR":
                         COR_ADVERSARIO = message["color"]
-                    elif message["event"] == "JOGADA":
-                        # TODO CHECK IF IS VALID
-                        ESTADO_JOGO[message["index"]] = message["color"]
-                    elif message["event"] == "CHAT":
+                    elif message["event"] == "JOGADA_1":
+                        realiza_jogada_1(message["index"], message["color"])
+                    elif message["event"] == "JOGADA_2":
+                        realiza_jogada_2(message["index_1"], message["index_2"], message["color"])
+                elif message["event"] == "CHAT":
                         add_to_messages(message["message"], who=2)
             except Exception as e:
                 pprint(e)
@@ -122,11 +139,10 @@ def send_encrypted(message: dict):
             deny = True
         else:
             COR_JOGADOR = message["color"]
-    elif message["event"] == "JOGADA":
-        index_jogada = message["index"]
-        cor_jogada = message["color"]
-        ESTADO_JOGO[index_jogada] = cor_jogada
-
+    elif message["event"] == "JOGADA_1":
+        deny = not realiza_jogada_1(message["index"], message["color"])
+    elif message["event"] == "JOGADA_2":
+        deny = not realiza_jogada_2(message["index_1"], message["index_2"], message["color"])
     elif message["event"] == "CHAT":
         message["message"] = message["message"][:MAX_CHAR_MSG]
         add_to_messages(message["message"], who=1)
@@ -142,11 +158,6 @@ def send_encrypted(message: dict):
 
 
 def encrypt_message(message: str, rsa_key=PUBLIC_KEY) -> bytes:
-    """
-    Convert a string to bytes and encrypt with RSA
-    :param message:
-    :return:
-    """
     message = message.encode(DEFAULT_ENCODING)
     encryped_msg = rsa.encrypt(message, rsa_key)
     return encryped_msg

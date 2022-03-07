@@ -229,27 +229,20 @@ def draw_game():
     for linha in linhas:
         pg.draw.line(screen, line_color, linha[0], linha[1], expessura_linha)
 
-    pg.draw.circle(
-        screen, ESTADO_JOGO[0] or black, posicoes_selecoes[0], size_circle_game
-    )
-    pg.draw.circle(
-        screen, ESTADO_JOGO[1] or black, posicoes_selecoes[1], size_circle_game
-    )
-    pg.draw.circle(
-        screen, ESTADO_JOGO[2] or black, posicoes_selecoes[2], size_circle_game
-    )
-    pg.draw.circle(
-        screen, ESTADO_JOGO[3] or black, posicoes_selecoes[3], size_circle_game
-    )
-    pg.draw.circle(
-        screen, ESTADO_JOGO[4] or black, posicoes_selecoes[4], size_circle_game
-    )
-    pg.draw.circle(
-        screen, ESTADO_JOGO[5] or black, posicoes_selecoes[5], size_circle_game
-    )
-    pg.draw.circle(
-        screen, ESTADO_JOGO[6] or black, posicoes_selecoes[6], size_circle_game
-    )
+    for idx, _ in enumerate(ESTADO_JOGO):
+        cor = ESTADO_JOGO[idx]
+        posicao = posicoes_selecoes[idx]
+
+        if IDX_SELECIONADO == idx:
+            pg.draw.circle(
+                screen, black, posicao, int(size_circle_game * 1.3)
+            )
+
+        pg.draw.circle(
+            screen, cor or black, posicao, size_circle_game
+        )
+
+
     draw_chat()
 
 
@@ -297,10 +290,16 @@ def send_color():
     return send_message_to_server({"event": "COLOR", "color": COR_JOGADOR})
 
 
-def send_jogada(index_jogada):
+def send_jogada_1(index_jogada):
     add_to_messages(f"Jogada: {index_jogada}")
     return send_message_to_server(
-        {"event": "JOGADA", "index": index_jogada, "color": COR_JOGADOR}
+        {"event": "JOGADA_1", "index": index_jogada, "color": COR_JOGADOR}
+    )
+
+def send_jogada_2(index_jogada_1, index_jogada_2):
+    add_to_messages(f"Jogada: {index_jogada_1} -> {index_jogada_2}")
+    return send_message_to_server(
+        {"event": "JOGADA_2", "index_1": index_jogada_1, "index_2": index_jogada_2, "color": COR_JOGADOR}
     )
 
 
@@ -355,8 +354,21 @@ def get_click():
     x, y = pg.mouse.get_pos()
     return x, y
 
+IDX_SELECIONADO = None
+def jogada_multipla(index_jogada):
+    global IDX_SELECIONADO
+    if IDX_SELECIONADO is None:
+        IDX_SELECIONADO = index_jogada
+    elif index_jogada != IDX_SELECIONADO:
+        send_jogada_2(IDX_SELECIONADO, index_jogada)
+        IDX_SELECIONADO = None
 
 def get_jogada():
     row, col, index_jogada = get_circle_selected(*get_click())
     if row:
-        send_jogada(index_jogada)
+        from client.server import ESTADO_JOGO
+        quantidade_de_jogadas = len([a for a in ESTADO_JOGO if a is not None])
+        if quantidade_de_jogadas < 6:
+            send_jogada_1(index_jogada)
+        else:
+            jogada_multipla(index_jogada)
