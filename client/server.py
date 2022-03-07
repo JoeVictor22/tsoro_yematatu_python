@@ -46,8 +46,8 @@ def handle_server(conn, addr):
                     elif message["event"] == "CHAT":
                         add_to_messages(message["message"], who=2)
 
-            except Exception as e:
-                pprint(e)
+            except Exception:
+                pass
 
 
 def realiza_jogada_1(posicao, cor):
@@ -59,11 +59,23 @@ def realiza_jogada_1(posicao, cor):
     return False
 
 def realiza_jogada_2(posicao_1, posicao_2, cor):
-    if ESTADO_JOGO[posicao_1] is None:
-        # ESTADO_JOGO[posicao] = cor
-        pprint("JOGADA 2")
-        return True
-    return False
+    if ESTADO_JOGO[posicao_2] is None:
+        jogada_realizada = [posicao_1, posicao_2]
+        jogada_realizada.sort()
+        # saltos permitidos
+        jumps = [[0,4],[0,5],[0,6],[1,3],[4,6]]
+        moves = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 4], [2, 3], [2, 5], [3, 6], [4, 5], [5, 6]]
+
+        for jogada in jumps+moves:
+            if jogada_realizada == jogada:
+                ESTADO_JOGO[posicao_1] = None
+                ESTADO_JOGO[posicao_2] = cor
+                return True
+        return False
+
+
+
+
 
 
 def handle_client(conn, addr):
@@ -88,8 +100,8 @@ def handle_client(conn, addr):
                         realiza_jogada_2(message["index_1"], message["index_2"], message["color"])
                 elif message["event"] == "CHAT":
                         add_to_messages(message["message"], who=2)
-            except Exception as e:
-                pprint(e)
+            except Exception:
+                pass
 
 
 def send_event(data: "bytes", publish=True, emit=True, bypass_turn=False):

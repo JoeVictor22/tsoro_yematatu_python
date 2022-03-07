@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import pygame as pg
 import time
 from pygame.locals import *
@@ -197,6 +199,11 @@ def game_opening(register=True):
     # run the game loop forever
     while True:
         draw_game()
+        if check_win():
+            time.sleep(1)
+            add_to_messages("Fim de jogo")
+            time.sleep(2)
+            break
 
         for event in pg.event.get():
             if event.type == QUIT:
@@ -205,6 +212,7 @@ def game_opening(register=True):
             elif event.type == MOUSEBUTTONDOWN:
                 # the user clicked; place an X or O
                 get_jogada()
+
                 # if False:
                 #     reset_game()
             elif event.type == pg.KEYDOWN:
@@ -212,7 +220,7 @@ def game_opening(register=True):
         pg.display.update()
         CLOCK.tick(fps)
 
-
+    sys.exit(0)
 
 def draw_game():
     screen.fill(white)
@@ -249,8 +257,28 @@ def draw_game():
 
 def check_win():
     # check for winning rows
-    pg.draw.line(screen, (250, 70, 70), (350, 50), (50, 350), 4)
-    add_to_messages("venceu???")
+
+    vitorias = [
+        [0, 1, 4],
+        [0, 2, 5],
+        [0, 3, 6],
+        [1, 2, 3],
+        [4, 5, 6]
+    ]
+
+    from client.server import ESTADO_JOGO
+    vencedor = None
+    for vitoria in vitorias:
+        if ESTADO_JOGO[vitoria[0]] is None:
+            continue
+
+        if ESTADO_JOGO[vitoria[0]] == ESTADO_JOGO[vitoria[1]] and ESTADO_JOGO[vitoria[1]] == ESTADO_JOGO[vitoria[2]]:
+            vencedor = ESTADO_JOGO[vitoria[0]]
+            break
+    if vencedor == COR_JOGADOR:
+        add_to_messages("Você venceu")
+    elif vencedor:
+        add_to_messages("Você perdeu")
 
 
 def reset_game():
@@ -357,16 +385,21 @@ def get_click():
 IDX_SELECIONADO = None
 def jogada_multipla(index_jogada):
     global IDX_SELECIONADO
-    if IDX_SELECIONADO is None:
+    from client.server import ESTADO_JOGO
+
+    if IDX_SELECIONADO == index_jogada:
+        IDX_SELECIONADO = None
+    elif IDX_SELECIONADO is None and ESTADO_JOGO[index_jogada] == COR_JOGADOR:
         IDX_SELECIONADO = index_jogada
-    elif index_jogada != IDX_SELECIONADO:
-        send_jogada_2(IDX_SELECIONADO, index_jogada)
+    elif IDX_SELECIONADO is not None and ESTADO_JOGO[index_jogada] is None:
+        idx_1 = deepcopy(IDX_SELECIONADO)
+        send_jogada_2(idx_1, index_jogada)
         IDX_SELECIONADO = None
 
 def get_jogada():
     row, col, index_jogada = get_circle_selected(*get_click())
+    from client.server import ESTADO_JOGO
     if row:
-        from client.server import ESTADO_JOGO
         quantidade_de_jogadas = len([a for a in ESTADO_JOGO if a is not None])
         if quantidade_de_jogadas < 6:
             send_jogada_1(index_jogada)
