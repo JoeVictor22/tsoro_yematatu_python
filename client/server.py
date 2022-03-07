@@ -21,13 +21,16 @@ DEFAULT_ENCODING = "utf-8"
 from pprint import pprint
 
 ESTADO_JOGO = [None for _ in range(7)]
-CLIENT_ID = None
 JOGADOR = None
 COR_ADVERSARIO, COR_JOGADOR = None, None
-def handle_server(conn, addr):
-    global COR_ADVERSARIO, ESTADO_JOGO
+SOCKET_THREAD = None
+QUEM_DEVE_JOGAR = None
+
+def handle_connections(conn, addr):
+    global COR_ADVERSARIO, ESTADO_JOGO, SOCKET_THREAD, QUEM_DEVE_JOGAR
     print("\nSERVER: ESPERANDO MSGS\n")
-    while True:
+
+    while not SOCKET_THREAD.quit:
         message = conn.recv(1024)
         if message != "":
             try:
@@ -39,6 +42,8 @@ def handle_server(conn, addr):
 
                     if message["event"] == "COLOR":
                         COR_ADVERSARIO = message["color"]
+                    if message["event"] == "FIRST":
+                        QUEM_DEVE_JOGAR = message["color"]
                     elif message["event"] == "JOGADA_1":
                         realiza_jogada_1(message["index"], message["color"])
                     elif message["event"] == "JOGADA_2":
@@ -51,14 +56,17 @@ def handle_server(conn, addr):
 
 
 def realiza_jogada_1(posicao, cor):
+
     quantidade_de_jogadas = len([a for a in ESTADO_JOGO if a is not None])
     print(quantidade_de_jogadas)
     if ESTADO_JOGO[posicao] is None and quantidade_de_jogadas < 6:
         ESTADO_JOGO[posicao] = cor
+        altera_jogador(cor)
         return True
     return False
 
 def realiza_jogada_2(posicao_1, posicao_2, cor):
+    global QUEM_DEVE_JOGAR
     if ESTADO_JOGO[posicao_2] is None:
         jogada_realizada = [posicao_1, posicao_2]
         jogada_realizada.sort()
@@ -70,38 +78,43 @@ def realiza_jogada_2(posicao_1, posicao_2, cor):
             if jogada_realizada == jogada:
                 ESTADO_JOGO[posicao_1] = None
                 ESTADO_JOGO[posicao_2] = cor
+                altera_jogador(cor)
                 return True
         return False
 
 
+def altera_jogador(cor):
+    global QUEM_DEVE_JOGAR
+    QUEM_DEVE_JOGAR = (COR_JOGADOR if cor == COR_ADVERSARIO else COR_ADVERSARIO)
 
 
 
-
-def handle_client(conn, addr):
-    global COR_ADVERSARIO, ESTADO_JOGO
-    print("\nCLIENT: GAME LOOP\n")
-
-    while True:
-        """Game loop"""
-        message = conn.recv(1024)
-        if message != "":
-            try:
-                message = decrypt_message(message)
-                message = message.decode()
-                message = json.loads(message)
-                if message.get("event"):
-                    print(f"[thread] {JOGADOR} : received: {message}")
-                    if message["event"] == "COLOR":
-                        COR_ADVERSARIO = message["color"]
-                    elif message["event"] == "JOGADA_1":
-                        realiza_jogada_1(message["index"], message["color"])
-                    elif message["event"] == "JOGADA_2":
-                        realiza_jogada_2(message["index_1"], message["index_2"], message["color"])
-                elif message["event"] == "CHAT":
-                        add_to_messages(message["message"], who=2)
-            except Exception:
-                pass
+# def handle_client(conn, addr):
+#     global COR_ADVERSARIO, ESTADO_JOGO, SOCKET_THREAD
+#     print("\nCLIENT: GAME LOOP\n")
+#
+#     while not SOCKET_THREAD.quit:
+#         """Game loop"""
+#         message = conn.recv(1024)
+#         if message != "":
+#             try:
+#                 message = decrypt_message(message)
+#                 message = message.decode()
+#                 message = json.loads(message)
+#                 if message.get("event"):
+#                     print(f"[thread] {JOGADOR} : received: {message}")
+#                     if message["event"] == "COLOR":
+#                         COR_ADVERSARIO = message["color"]
+#                     if message["event"] == "FIRST":
+#                         primeiro_a_jogar(message["color"])
+#                     elif message["event"] == "JOGADA_1":
+#                         realiza_jogada_1(message["index"], message["color"])
+#                     elif message["event"] == "JOGADA_2":
+#                         realiza_jogada_2(message["index_1"], message["index_2"], message["color"])
+#                 elif message["event"] == "CHAT":
+#                         add_to_messages(message["message"], who=2)
+#             except Exception:
+#                 pass
 
 
 def send_event(data: "bytes", publish=True, emit=True, bypass_turn=False):
@@ -137,20 +150,36 @@ def add_to_messages(message, who=0):
 
 
 
+def primeiro_a_jogar(cor):
+    global QUEM_DEVE_JOGAR
+    print("primeiro")
+    print(cor)
+    print(QUEM_DEVE_JOGAR)
+    if QUEM_DEVE_JOGAR is None:
+        QUEM_DEVE_JOGAR = cor
+        print("eh vc")
+        return True
+    print("n ehvc")
+    return False
+
+def seleciona_cor(cor):
+    global COR_JOGADOR, COR_ADVERSARIO
+
+    if COR_ADVERSARIO and list(COR_ADVERSARIO) == list(cor):
+        return False
+
+    COR_JOGADOR = cor
+    return True
 
 def send_encrypted(message: dict):
-    global COR_JOGADOR, COR_ADVERSARIO, ESTADO_JOGO
+    global COR_JOGADOR, COR_ADVERSARIO, ESTADO_JOGO, QUEM_DEVE_JOGAR
     ## TODO: check event and alter server_state, deny if needed
     deny = False
 
     if message["event"] == "COLOR":
-        pprint(COR_JOGADOR)
-        pprint(COR_ADVERSARIO)
-        pprint(message["color"])
-        if COR_ADVERSARIO and list(COR_ADVERSARIO) == list(message["color"]):
-            deny = True
-        else:
-            COR_JOGADOR = message["color"]
+        deny = not seleciona_cor(message["color"])
+    elif message["event"] == "FIRST":
+        deny = not primeiro_a_jogar(message["color"])
     elif message["event"] == "JOGADA_1":
         deny = not realiza_jogada_1(message["index"], message["color"])
     elif message["event"] == "JOGADA_2":
@@ -187,8 +216,10 @@ def create_client():
     JOGADOR = 2
     print("Trying to connect")
     s.connect(("127.0.0.1", 8123))
-    t = threading.Thread(target=handle_client, args=(s, "localhost"))
-    t.start()
+    global SOCKET_THREAD
+    SOCKET_THREAD = threading.Thread(target=handle_connections, args=(s, "localhost"))
+    SOCKET_THREAD.quit = False
+    SOCKET_THREAD.start()
     print("Connected")
     return 2
 
@@ -202,6 +233,10 @@ def create_server():
     s.listen(20)
     print("Waiting for connection")
     c, addr = s.accept()
-    t = threading.Thread(target=handle_server, args=(c, addr))
-    t.start()
+    global SOCKET_THREAD
+    SOCKET_THREAD = threading.Thread(target=handle_connections, args=(c, addr))
+    SOCKET_THREAD.quit = False
+    SOCKET_THREAD.start()
+
     return 1
+
