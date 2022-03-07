@@ -19,7 +19,11 @@ line_color = black
 GAME = [0 for _ in range(7)]
 player_color = None
 CORES_MATRIX = [[red, green, blue], [yellow, cyan, magenta], [orange, brown, pink]]
-CORES_MATRIX_NAME = [["Vermelho", "Verde", "Azul"], ["Amarelo", "Ciano", "Magenta"], ["Laranja", "Marrom", "Rosa"]]
+CORES_MATRIX_NAME = [
+    ["Vermelho", "Verde", "Azul"],
+    ["Amarelo", "Ciano", "Magenta"],
+    ["Laranja", "Marrom", "Rosa"],
+]
 
 pg.init()
 fps = 30
@@ -62,6 +66,8 @@ opening = pg.transform.scale(opening, (width, height + 100))
 
 INPUT_MESSAGE_BUFFER = ""
 INPUT_BUFFER = ""
+
+
 def get_input(event):
     charset = "abcdefghijklmnopqrstuvyxwz1234567890?!.,"
     if event.key == pg.K_RETURN:
@@ -79,33 +85,37 @@ def enviar_input_buffer():
     send_message(INPUT_BUFFER)
     clear_input_buffer()
 
+
 def clear_input_buffer():
     global INPUT_BUFFER
     INPUT_BUFFER = ""
 
-def add_to_input_buffer(key:str):
+
+def add_to_input_buffer(key: str):
     global INPUT_BUFFER
     if len(INPUT_BUFFER) > MAX_CHAR_MSG:
         INPUT_BUFFER = INPUT_BUFFER[1:]
     INPUT_BUFFER += key
 
+
 def backspace_to_input_buffer():
     global INPUT_BUFFER
     INPUT_BUFFER = INPUT_BUFFER[:-1]
 
+
 def draw_chat():
     global INPUT_BUFFER
     from client.server import MESSAGE_BUFFER
+
     buffer = MESSAGE_BUFFER.copy()
     buffer.insert(0, INPUT_BUFFER)
     font_size = 20
     font = pg.font.Font(None, font_size)
 
-    screen.fill((0, 0, 0), (0, width, width, height)) # box
+    screen.fill((0, 0, 0), (0, width, width, height))  # box
 
-
-    added_height = int(font_size/100*70)
-    padding = int(font_size/100*20)
+    added_height = int(font_size / 100 * 70)
+    padding = int(font_size / 100 * 20)
     for idx, message in enumerate(buffer):
         iter_message = message
         text_color = green
@@ -115,22 +125,22 @@ def draw_chat():
             if message == "":
                 iter_message = "Digite algo e envie pressionando ENTER!"
 
-
         if message.startswith("[info]"):
             text_color = cyan
 
         if message.startswith("[enemy]"):
             text_color = red
 
-
-
         text = font.render(str(iter_message), True, text_color)
         text.get_rect()
-        text_rect = text.get_rect(left=padding, top= (height + height/4 - added_height))
+        text_rect = text.get_rect(
+            left=padding, top=(height + height / 4 - added_height)
+        )
         added_height += font_size
         screen.blit(text, text_rect)
 
     pg.display.update()
+
 
 def get_first_player():
     global COR_JOGADOR, EH_MINHA_JOGADA
@@ -139,10 +149,6 @@ def get_first_player():
     row, col = get_box_selected(x, y)
     global CORES_MATRIX
     if row == 1 and (col == 0 or col == 2):
-        # if not send_color():
-        from pprint import pprint
-
-        pprint(COR_JOGADOR)
         if col == 0:
             if send_primeiro_a_jogar():
                 send_message("Eu quero jogar primeiro!")
@@ -152,10 +158,9 @@ def get_first_player():
         else:
             send_message("Quero que você jogue primeiro!")
 
-def game_opening(register=True):
 
-    if register:
-        send_register()
+def game_opening():
+
     screen.blit(opening, (0, 0))
     pg.display.update()
     time.sleep(1)
@@ -192,11 +197,11 @@ def game_opening(register=True):
 
     add_to_messages("Selecione sua cor")
 
-
-    while COR_JOGADOR is None or COR_ADVERSARIO is None: # se as cores forem selecionadas
+    while (
+        COR_JOGADOR is None or COR_ADVERSARIO is None
+    ):  # se as cores forem selecionadas
         draw_chat()
         from client.server import COR_ADVERSARIO
-
 
         for event in pg.event.get():
             if event.type == QUIT:
@@ -212,15 +217,13 @@ def game_opening(register=True):
 
     add_to_messages("Quem joga primeiro?")
     screen.fill(white)
-    pg.draw.circle(
-        screen, COR_JOGADOR, (width / 6, height / 2), size_circle_color
-    )
+    pg.draw.circle(screen, COR_JOGADOR, (width / 6, height / 2), size_circle_color)
     pg.draw.circle(
         screen, COR_ADVERSARIO, (height / 1.2, height / 2), size_circle_color
     )
 
     global QUEM_DEVE_JOGAR
-    while QUEM_DEVE_JOGAR is None: # se o primeiro a jogar for selecionado
+    while QUEM_DEVE_JOGAR is None:  # se o primeiro a jogar for selecionado
         draw_chat()
         from client.server import QUEM_DEVE_JOGAR
 
@@ -238,20 +241,20 @@ def game_opening(register=True):
 
     add_to_messages("Jogo iniciado!")
 
-
     # run the game loop forever
-    while not check_win():
+    while not check_game_ended():
         draw_game()
         from client.server import QUEM_DEVE_JOGAR
+
         for event in pg.event.get():
             if event.type == QUIT:
                 quit()
-            elif event.type == MOUSEBUTTONDOWN and QUEM_DEVE_JOGAR == COR_JOGADOR:
-                # the user clicked; place an X or O
-                get_jogada()
+            elif event.type == MOUSEBUTTONDOWN:
+                if get_empate_selected(*get_click()):
+                    send_empate()
+                if QUEM_DEVE_JOGAR == COR_JOGADOR:
+                    get_jogada()
 
-                # if False:
-                #     reset_game()
             elif event.type == pg.KEYDOWN:
                 get_input(event)
         pg.display.update()
@@ -264,8 +267,10 @@ def game_opening(register=True):
     time.sleep(3)
     quit()
 
+
 def quit():
     from client.server import SOCKET_THREAD
+
     SOCKET_THREAD.quit = True
     pg.quit()
     sys.exit()
@@ -291,13 +296,9 @@ def draw_game():
         posicao = posicoes_selecoes[idx]
 
         if IDX_SELECIONADO == idx:
-            pg.draw.circle(
-                screen, black, posicao, int(size_circle_game * 1.3)
-            )
+            pg.draw.circle(screen, black, posicao, int(size_circle_game * 1.3))
 
-        pg.draw.circle(
-            screen, cor or black, posicao, size_circle_game
-        )
+        pg.draw.circle(screen, cor or black, posicao, size_circle_game)
 
     # pinta de quem é o turno
     font_size = 20
@@ -307,58 +308,63 @@ def draw_game():
     padding = int(font_size / 100 * 20)
     text_rect = text.get_rect(left=padding, top=padding)
     screen.blit(text, text_rect)
-    pg.draw.circle(
-        screen, QUEM_DEVE_JOGAR, (font_size*2, font_size*2), font_size
-    )
+    pg.draw.circle(screen, QUEM_DEVE_JOGAR, (font_size * 2, font_size * 2), font_size)
 
     # pinta sua cor
     text = font.render("Sua cor", True, black)
     text.get_rect()
-    text_rect = text.get_rect(left=width/100*84, top=padding)
+    text_rect = text.get_rect(left=width / 100 * 84, top=padding)
     screen.blit(text, text_rect)
     pg.draw.circle(
         screen, COR_JOGADOR, (width - (font_size * 2), font_size * 2), font_size
     )
 
-
     # pinta botão de empate
-    button_width = int(width/6)
+    button_width = int(width / 6)
     button_height = int(font_size * 1.5)
     border = 5
-    rect_w_border = pg.Surface((button_width + border * 2, button_height + border * 2), pg.SRCALPHA)
+    x_button = (width / 2) - (button_width / 2) - border
+    y_button = padding
+    rect_w_border = pg.Surface(
+        (button_width + border * 2, button_height + border * 2), pg.SRCALPHA
+    )
     pg.draw.rect(rect_w_border, white, (border, border, button_width, button_height), 0)
     for i in range(1, border):
-        pg.draw.rect(rect_w_border, black, (border - i, border - i, button_width + 5, button_height + 5), 1)
+        pg.draw.rect(
+            rect_w_border,
+            black,
+            (border - i, border - i, button_width + 5, button_height + 5),
+            1,
+        )
 
-    screen.blit(rect_w_border,((width/2) - (button_width/2) - border, padding) )
+    screen.blit(rect_w_border, (x_button, y_button))
 
     text = font.render("Empate", True, black)
     text.get_rect()
-    text_rect = text.get_rect(center=(width/2, padding + border + button_height/2 ))
+    text_rect = text.get_rect(center=(width / 2, padding + border + button_height / 2))
     screen.blit(text, text_rect)
 
     draw_chat()
 
 
+def check_game_ended():
+    vitorias = [[0, 1, 4], [0, 2, 5], [0, 3, 6], [1, 2, 3], [4, 5, 6]]
 
-def check_win():
-    # check for winning rows
+    from client.server import ESTADO_JOGO, EU_DESISTO, ADVERSARIO_DESISTE
 
-    vitorias = [
-        [0, 1, 4],
-        [0, 2, 5],
-        [0, 3, 6],
-        [1, 2, 3],
-        [4, 5, 6]
-    ]
+    if EU_DESISTO and ADVERSARIO_DESISTE:
+        add_to_messages("Empate")
+        return True
 
-    from client.server import ESTADO_JOGO
     vencedor = None
     for vitoria in vitorias:
         if ESTADO_JOGO[vitoria[0]] is None:
             continue
 
-        if ESTADO_JOGO[vitoria[0]] == ESTADO_JOGO[vitoria[1]] and ESTADO_JOGO[vitoria[1]] == ESTADO_JOGO[vitoria[2]]:
+        if (
+            ESTADO_JOGO[vitoria[0]] == ESTADO_JOGO[vitoria[1]]
+            and ESTADO_JOGO[vitoria[1]] == ESTADO_JOGO[vitoria[2]]
+        ):
             vencedor = ESTADO_JOGO[vitoria[0]]
             break
     if vencedor == COR_JOGADOR:
@@ -369,6 +375,7 @@ def check_win():
         return True
 
     return False
+
 
 def reset_game():
     game_opening()
@@ -396,28 +403,33 @@ def send_message_to_server(message: dict):
     return send_encrypted(message)
 
 
-def send_surrender():
-    return send_message_to_server({"event": "SURRENDER"})
-
-
-def send_register():
-    return send_message_to_server({"event": "REGISTER"})
+def send_empate():
+    send_message("Quero empatar")
+    return send_message_to_server({"event": "SURRENDER", "color": COR_JOGADOR})
 
 
 def send_color():
     return send_message_to_server({"event": "COLOR", "color": COR_JOGADOR})
 
+
 def send_primeiro_a_jogar():
     return send_message_to_server({"event": "FIRST", "color": COR_JOGADOR})
+
 
 def send_jogada_1(index_jogada):
     return send_message_to_server(
         {"event": "JOGADA_1", "index": index_jogada, "color": COR_JOGADOR}
     )
 
+
 def send_jogada_2(index_jogada_1, index_jogada_2):
     return send_message_to_server(
-        {"event": "JOGADA_2", "index_1": index_jogada_1, "index_2": index_jogada_2, "color": COR_JOGADOR}
+        {
+            "event": "JOGADA_2",
+            "index_1": index_jogada_1,
+            "index_2": index_jogada_2,
+            "color": COR_JOGADOR,
+        }
     )
 
 
@@ -450,6 +462,24 @@ def get_box_selected(x, y):
     return row, col
 
 
+def get_empate_selected(x, y):
+    button_width = int(width / 6)
+    button_height = int(20 * 1.5)
+    border = 5
+    padding = int(20 / 100 * 20)
+    x_button = (width / 2) - (button_width / 2) - border
+    y_button = padding
+
+    if (
+        x >= x_button
+        and x <= x_button + button_width
+        and y >= y_button
+        and y <= y_button + button_height
+    ):
+        return True
+    return False
+
+
 def get_circle_selected(x, y):
     row, col, i = None, None, None
 
@@ -472,7 +502,10 @@ def get_click():
     x, y = pg.mouse.get_pos()
     return x, y
 
+
 IDX_SELECIONADO = None
+
+
 def jogada_multipla(index_jogada):
     global IDX_SELECIONADO, EH_MINHA_JOGADA
     from client.server import ESTADO_JOGO
@@ -486,9 +519,11 @@ def jogada_multipla(index_jogada):
         send_jogada_2(idx_1, index_jogada)
         IDX_SELECIONADO = None
 
+
 def get_jogada():
     row, col, index_jogada = get_circle_selected(*get_click())
     from client.server import ESTADO_JOGO
+
     if row:
         quantidade_de_jogadas = len([a for a in ESTADO_JOGO if a is not None])
         if quantidade_de_jogadas < 6:
