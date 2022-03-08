@@ -5,41 +5,24 @@ import pygame as pg
 import time
 from pygame.locals import *
 
-# based on https://techvidvan.com/tutorials/python-game-project-tic-tac-toe/
-# initialize global variables
-from client.server import send_encrypted, add_to_messages
-
-XO = "x"
-winner = None
-draw = False
+from client.server import send_crypted, add_to_message_buffer
 from client.const import *
 
-line_color = black
-# TicTacToe 3x3 board
-GAME = [0 for _ in range(7)]
-player_color = None
-CORES_MATRIX = [[red, green, blue], [yellow, cyan, magenta], [orange, brown, pink]]
-CORES_MATRIX_NAME = [
-    ["Vermelho", "Verde", "Azul"],
-    ["Amarelo", "Ciano", "Magenta"],
-    ["Laranja", "Marrom", "Rosa"],
-]
 
+# Inicia PyGame
 pg.init()
-fps = 30
 CLOCK = pg.time.Clock()
-screen = pg.display.set_mode((width, height + 100), 0, 32)
+screen = pg.display.set_mode((width, int(height * 1.25)), 0, 32)
 pg.display.set_caption("Tsoro Yematatu")
-size_circle_game = 15
-size_circle_color = 50
-expessura_linha = int(size_circle_game / 2)
 
-#
+# Variáveis do jogo
 EMPATE = [False, False]
 COR_JOGADOR, COR_ADVERSARIO = None, None
 EH_MINHA_JOGADA = False
 ESTADO_JOGO = [None for _ in range(7)]
 QUEM_DEVE_JOGAR = None
+INPUT_MESSAGE_BUFFER = ""
+INPUT_BUFFER = ""
 
 posicoes_selecoes = [
     [width / 2, height / 6],
@@ -58,29 +41,21 @@ posicoes_selecoes[3][0] = (posicoes_selecoes[0][0] + posicoes_selecoes[6][0]) / 
 posicoes_selecoes[3][1] = (posicoes_selecoes[0][1] + posicoes_selecoes[6][1]) / 2
 
 
-# loading the images
-opening = pg.image.load("background.png")
-# resizing images
-opening = pg.transform.scale(opening, (width, height + 100))
-
-
-INPUT_MESSAGE_BUFFER = ""
-INPUT_BUFFER = ""
+opening = pg.Surface((width, int(height * 1.25)), SRCALPHA)
 
 
 def get_input(event):
-    charset = "abcdefghijklmnopqrstuvyxwz1234567890?!.,"
     if event.key == pg.K_RETURN:
-        enviar_input_buffer()
+        send_input_buffer()
     elif event.key == pg.K_SPACE:
         add_to_input_buffer(" ")
     elif event.key == pg.K_BACKSPACE:
         backspace_to_input_buffer()
-    elif pg.key.name(event.key) in charset:
+    elif pg.key.name(event.key) in CHARSET:
         add_to_input_buffer(pg.key.name(event.key))
 
 
-def enviar_input_buffer():
+def send_input_buffer():
     global INPUT_BUFFER
     send_message(INPUT_BUFFER)
     clear_input_buffer()
@@ -154,12 +129,12 @@ def get_first_player():
                 send_message("Eu quero jogar primeiro!")
                 EH_MINHA_JOGADA = True
             else:
-                add_to_messages("O outro jogador já pediu para jogar primeiro!")
+                add_to_message_buffer("O outro jogador já pediu para jogar primeiro!")
         else:
             send_message("Quero que você jogue primeiro!")
 
 
-def game_opening():
+def start_game():
 
     screen.blit(opening, (0, 0))
     pg.display.update()
@@ -167,35 +142,9 @@ def game_opening():
     screen.fill(white)
 
     global CORES_MATRIX, COR_ADVERSARIO, COR_JOGADOR
-    pg.draw.circle(
-        screen, CORES_MATRIX[0][0], (width / 6, height / 6), size_circle_color
-    )
-    pg.draw.circle(
-        screen, CORES_MATRIX[0][1], (width / 2, height / 6), size_circle_color
-    )
-    pg.draw.circle(
-        screen, CORES_MATRIX[0][2], (height / 1.2, height / 6), size_circle_color
-    )
-    pg.draw.circle(
-        screen, CORES_MATRIX[1][0], (width / 6, height / 2), size_circle_color
-    )
-    pg.draw.circle(
-        screen, CORES_MATRIX[1][1], (width / 2, height / 2), size_circle_color
-    )
-    pg.draw.circle(
-        screen, CORES_MATRIX[1][2], (height / 1.2, height / 2), size_circle_color
-    )
-    pg.draw.circle(
-        screen, CORES_MATRIX[2][0], (width / 6, height / 1.2), size_circle_color
-    )
-    pg.draw.circle(
-        screen, CORES_MATRIX[2][1], (width / 2, height / 1.2), size_circle_color
-    )
-    pg.draw.circle(
-        screen, CORES_MATRIX[2][2], (height / 1.2, height / 1.2), size_circle_color
-    )
+    draw_color_picker()
 
-    add_to_messages("Selecione sua cor")
+    add_to_message_buffer("Selecione sua cor")
 
     while (
         COR_JOGADOR is None or COR_ADVERSARIO is None
@@ -213,13 +162,13 @@ def game_opening():
                 get_input(event)
 
         pg.display.update()
-        CLOCK.tick(fps)
+        CLOCK.tick(FPS)
 
-    add_to_messages("Quem joga primeiro?")
+    add_to_message_buffer("Quem joga primeiro?")
     screen.fill(white)
-    pg.draw.circle(screen, COR_JOGADOR, (width / 6, height / 2), size_circle_color)
+    pg.draw.circle(screen, COR_JOGADOR, (width / 6, height / 2), SIZE_CIRCLE_COLOR)
     pg.draw.circle(
-        screen, COR_ADVERSARIO, (height / 1.2, height / 2), size_circle_color
+        screen, COR_ADVERSARIO, (height / 1.2, height / 2), SIZE_CIRCLE_COLOR
     )
 
     global QUEM_DEVE_JOGAR
@@ -237,9 +186,9 @@ def game_opening():
                 get_input(event)
 
         pg.display.update()
-        CLOCK.tick(fps)
+        CLOCK.tick(FPS)
 
-    add_to_messages("Jogo iniciado!")
+    add_to_message_buffer("Jogo iniciado!")
 
     # run the game loop forever
     while not check_game_ended():
@@ -258,11 +207,11 @@ def game_opening():
             elif event.type == pg.KEYDOWN:
                 get_input(event)
         pg.display.update()
-        CLOCK.tick(fps)
+        CLOCK.tick(FPS)
 
     draw_game()
     time.sleep(1)
-    add_to_messages("Fim de jogo")
+    add_to_message_buffer("Fim de jogo")
     draw_game()
     time.sleep(3)
     quit()
@@ -274,6 +223,37 @@ def quit():
     SOCKET_THREAD.quit = True
     pg.quit()
     sys.exit()
+
+
+def draw_color_picker():
+    # Escolha de cores
+    pg.draw.circle(
+        screen, CORES_MATRIX[0][0], (width / 6, height / 6), SIZE_CIRCLE_COLOR
+    )
+    pg.draw.circle(
+        screen, CORES_MATRIX[0][1], (width / 2, height / 6), SIZE_CIRCLE_COLOR
+    )
+    pg.draw.circle(
+        screen, CORES_MATRIX[0][2], (height / 1.2, height / 6), SIZE_CIRCLE_COLOR
+    )
+    pg.draw.circle(
+        screen, CORES_MATRIX[1][0], (width / 6, height / 2), SIZE_CIRCLE_COLOR
+    )
+    pg.draw.circle(
+        screen, CORES_MATRIX[1][1], (width / 2, height / 2), SIZE_CIRCLE_COLOR
+    )
+    pg.draw.circle(
+        screen, CORES_MATRIX[1][2], (height / 1.2, height / 2), SIZE_CIRCLE_COLOR
+    )
+    pg.draw.circle(
+        screen, CORES_MATRIX[2][0], (width / 6, height / 1.2), SIZE_CIRCLE_COLOR
+    )
+    pg.draw.circle(
+        screen, CORES_MATRIX[2][1], (width / 2, height / 1.2), SIZE_CIRCLE_COLOR
+    )
+    pg.draw.circle(
+        screen, CORES_MATRIX[2][2], (height / 1.2, height / 1.2), SIZE_CIRCLE_COLOR
+    )
 
 
 def draw_game():
@@ -289,16 +269,16 @@ def draw_game():
     linhas.append([posicoes_selecoes[4], posicoes_selecoes[6]])
 
     for linha in linhas:
-        pg.draw.line(screen, line_color, linha[0], linha[1], expessura_linha)
+        pg.draw.line(screen, black, linha[0], linha[1], LINE_HEIGHT)
 
     for idx, _ in enumerate(ESTADO_JOGO):
         cor = ESTADO_JOGO[idx]
         posicao = posicoes_selecoes[idx]
 
         if IDX_SELECIONADO == idx:
-            pg.draw.circle(screen, black, posicao, int(size_circle_game * 1.3))
+            pg.draw.circle(screen, black, posicao, int(SIZE_CIRCLE_GAME * 1.3))
 
-        pg.draw.circle(screen, cor or black, posicao, size_circle_game)
+        pg.draw.circle(screen, cor or black, posicao, SIZE_CIRCLE_GAME)
 
     # pinta de quem é o turno
     font_size = 20
@@ -353,7 +333,7 @@ def check_game_ended():
     from client.server import ESTADO_JOGO, EU_DESISTO, ADVERSARIO_DESISTE
 
     if EU_DESISTO and ADVERSARIO_DESISTE:
-        add_to_messages("Empate")
+        add_to_message_buffer("Empate")
         return True
 
     vencedor = None
@@ -368,17 +348,17 @@ def check_game_ended():
             vencedor = ESTADO_JOGO[vitoria[0]]
             break
     if vencedor == COR_JOGADOR:
-        add_to_messages("Você venceu")
+        add_to_message_buffer("Você venceu")
         return True
     elif vencedor:
-        add_to_messages("Você perdeu")
+        add_to_message_buffer("Você perdeu")
         return True
 
     return False
 
 
 def reset_game():
-    game_opening()
+    start_game()
 
 
 def get_color():
@@ -391,16 +371,16 @@ def get_color():
         COR_JOGADOR = CORES_MATRIX[row][col]
 
         if not send_color():
-            add_to_messages("Cor já selecionada...")
+            add_to_message_buffer("Cor já selecionada...")
             COR_JOGADOR = None
         else:
             nome_cor = CORES_MATRIX_NAME[row][col]
             send_message(f"Escolhi a cor: {nome_cor}")
-            add_to_messages("Aguardando o outro jogador...")
+            add_to_message_buffer("Aguardando o outro jogador...")
 
 
 def send_message_to_server(message: dict):
-    return send_encrypted(message)
+    return send_crypted(message)
 
 
 def send_empate():
@@ -485,7 +465,7 @@ def get_circle_selected(x, y):
 
     for i, posicao in enumerate(posicoes_selecoes):
         ponto_x, ponto_y = posicao[0], posicao[1]
-        ponto_tam = size_circle_game
+        ponto_tam = SIZE_CIRCLE_GAME
         if (
             x >= ponto_x - (ponto_tam)
             and x <= ponto_x + (ponto_tam)

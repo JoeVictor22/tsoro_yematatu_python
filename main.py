@@ -1,10 +1,6 @@
 if __name__ == "__main__":
-    from client.server import create_client, create_server
-    from client.client import game_opening
+    from client.server import create_connection
+    from client.client import start_game
 
-    try:
-        create_client()
-        game_opening()
-    except Exception:
-        create_server()
-        game_opening()
+    create_connection()
+    start_game()
