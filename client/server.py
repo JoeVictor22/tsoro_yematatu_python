@@ -198,7 +198,7 @@ def encrypt_message(message: str, rsa_key=PUBLIC_KEY) -> bytes:
     return encryped_msg
 
 
-def decrypt_message(message) -> str:
+def decrypt_message(message) -> bytes:
     decrypted_msg = rsa.decrypt(message, PRIVATE_KEY)
     return decrypted_msg
 
